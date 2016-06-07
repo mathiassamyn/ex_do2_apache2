@@ -1,0 +1,34 @@
+- hosts: webservers
+  sudo: yes
+  serial: 1
+
+  pre_tasks:
+      - name: Disable server in HAProxy.
+        shell: echo "disable server opdrachtAnsible/{{ inventory_hostname }}" | socat stdio /var/lib/haproxy/stats
+        delegate_to: lb
+
+  tasks:
+      - name: Install apache.
+        apt: name={{ item }} state=present update_cache=yes
+        with_items:
+          - apache2
+          - php5
+
+      - name: Write our apache config file.
+        template: src=templates/apache_config.j2 dest=/etc/apache2/sites-enabled/000-default.conf
+        notify: restart apache
+
+      - name: Deploy website content.
+        template: src=templates/index.html.j2 dest=/var/www/index.html
+
+      - name: Deploy phpinfo page.
+        template: src=templates/phpinfo.php.j2 dest=/var/www/phpinfo.php
+
+  handlers:
+      - name: restart apache
+        service: name=apache2 state=restarted
+
+  post_tasks:
+      - name: Enable server in HAProxy.
+        shell: echo "enable server opdrachtAnsible/{{ inventory_hostname }}" | socat stdio /var/lib/haproxy/stats
+        delegate_to: lb

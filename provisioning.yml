@@ -1,0 +1,50 @@
+---
+
+# webservers
+- hosts: webservers
+  sudo: yes
+
+  tasks:
+      - name: Install apache.
+        apt: name={{ item }} state=present update_cache=yes
+        with_items:
+          - apache2
+          - php5
+
+      - name: Write our apache config file.
+        template: src=templates/apache_config.j2 dest=/etc/apache2/sites-enabled/000-default.conf
+        notify: restart apache
+
+      - name: Deploy website content.
+        template: src=templates/index.html.j2 dest=/var/www/index.html
+
+      - name: Deploy phpinfo page.
+        template: src=templates/phpinfo.php.j2 dest=/var/www/phpinfo.php
+
+  handlers:
+      - name: restart apache
+        service: name=apache2 state=restarted
+
+# loadbalancer
+- hosts: lb
+  sudo: yes
+
+  tasks:
+      - name: Install HAProxy and socat.
+        apt: name={{ item }} state=present update_cache=yes
+        with_items:
+          - haproxy
+          - socat
+
+      - name: enable haproxy
+        lineinfile: dest=/etc/default/haproxy regexp="^ENABLED" line="ENABLED=1"
+        notify: restart haproxy 
+
+      - name: deploy haproxy config
+        template: src=templates/haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg
+        notify: restart haproxy
+
+  handlers:
+      - name: restart haproxy
+        service: name=haproxy state=restarted	
+
